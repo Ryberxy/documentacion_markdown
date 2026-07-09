@@ -25,7 +25,11 @@ jobs:
       - name: Detectar ficheros modificados
         id: ficheros
         run: |
-          git diff --name-only HEAD~1 HEAD -- 'CKA/*.md' > /tmp/modificados.txt
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            git diff --name-only HEAD~1 HEAD -- 'CKA/*.md' > /tmp/modificados.txt
+          else
+            git diff-tree --no-commit-id -r --name-only HEAD -- 'CKA/*.md' > /tmp/modificados.txt
+          fi
           cat /tmp/modificados.txt
 
       - name: Convertir a PDF
