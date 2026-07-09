@@ -29,19 +29,15 @@ jobs:
 
       - name: Detectar ficheros modificados
         run: |
-          # Si se lanzó manualmente con un fichero concreto
           if [ -n "${{ github.event.inputs.fichero }}" ]; then
             echo "${{ github.event.inputs.fichero }}" > /tmp/modificados.txt
-
-          # Si es push normal
           elif git rev-parse HEAD~1 >/dev/null 2>&1; then
-            git diff --name-only HEAD~1 HEAD -- 'CKA/*.md' > /tmp/modificados.txt
+            git diff --name-only HEAD~1 HEAD -- 'CKA/**/*.md' > /tmp/modificados.txt
           else
-            git diff-tree --no-commit-id -r --name-only HEAD -- 'CKA/*.md' > /tmp/modificados.txt
+            git diff-tree --no-commit-id -r --name-only HEAD -- 'CKA/' > /tmp/modificados.txt
           fi
-
-          echo "=== Ficheros a procesar ==="
           cat /tmp/modificados.txt
+
       - name: Convertir a PDF
         run: |
           python3 scripts/convertir.py /tmp/modificados.txt
@@ -62,8 +58,13 @@ jobs:
 
       - name: Copiar PDFs al repo destino
         run: |
-          mkdir -p documentacion_estudio/CKA
-          cp /tmp/pdfs/*.pdf documentacion_estudio/CKA/
+          while IFS= read -r fichero; do
+            if [ -f "/tmp/pdfs/$(basename ${fichero%.md}).pdf" ]; then
+              SUBDIR=$(dirname $fichero)
+              mkdir -p documentacion_estudio/$SUBDIR
+              cp "/tmp/pdfs/$(basename ${fichero%.md}).pdf" "documentacion_estudio/$SUBDIR/"
+            fi
+          done < /tmp/modificados.txt
 
       - name: Push al repo documentacion
         run: |
