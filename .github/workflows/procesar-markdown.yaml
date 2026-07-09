@@ -8,7 +8,11 @@ on:
     paths:
       - 'CKA/**.md'
   workflow_dispatch:
-
+    inputs:
+      fichero:
+        description: 'Fichero a procesar (ej: CKA/01ArquitecturaKubernetes.md)'
+        required: false
+        default: ''
 jobs:
   convertir:
     runs-on: ubuntu-latest
@@ -24,15 +28,20 @@ jobs:
           pip3 install pyyaml markdown weasyprint
 
       - name: Detectar ficheros modificados
-        id: ficheros
         run: |
-          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+          # Si se lanzó manualmente con un fichero concreto
+          if [ -n "${{ github.event.inputs.fichero }}" ]; then
+            echo "${{ github.event.inputs.fichero }}" > /tmp/modificados.txt
+
+          # Si es push normal
+          elif git rev-parse HEAD~1 >/dev/null 2>&1; then
             git diff --name-only HEAD~1 HEAD -- 'CKA/*.md' > /tmp/modificados.txt
           else
             git diff-tree --no-commit-id -r --name-only HEAD -- 'CKA/*.md' > /tmp/modificados.txt
           fi
-          cat /tmp/modificados.txt
 
+          echo "=== Ficheros a procesar ==="
+          cat /tmp/modificados.txt
       - name: Convertir a PDF
         run: |
           python3 scripts/convertir.py /tmp/modificados.txt
