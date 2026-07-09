@@ -1,0 +1,54 @@
+# .github/workflows/procesar-markdown.yml
+name: Convertir Markdown a PDF
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'CKA/**.md'
+
+jobs:
+  convertir:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo markdown
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install pyyaml markdown weasyprint
+
+      - name: Detectar ficheros modificados
+        id: ficheros
+        run: |
+          git diff --name-only HEAD~1 HEAD -- 'CKA/*.md' > /tmp/modificados.txt
+          cat /tmp/modificados.txt
+
+      - name: Convertir a PDF
+        run: |
+          python3 scripts/convertir.py /tmp/modificados.txt
+
+      - name: Checkout repo documentacion
+        uses: actions/checkout@v4
+        with:
+          repository: Ryberxy/documentacion_estudio
+          token: ${{ secrets.DOCS_TOKEN }}
+          path: documentacion_estudio
+
+      - name: Copiar PDFs al repo destino
+        run: |
+          mkdir -p documentacion_estudio/CKA
+          cp /tmp/pdfs/*.pdf documentacion_estudio/CKA/
+
+      - name: Push al repo documentacion
+        run: |
+          cd documentacion_estudio
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add CKA/
+          git diff --staged --quiet || git commit -m "PDF generado desde ${{ github.sha }}"
+          git push
