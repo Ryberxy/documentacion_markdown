@@ -8,11 +8,7 @@ on:
     paths:
       - 'CKA/**.md'
   workflow_dispatch:
-    inputs:
-      fichero:
-        description: 'Fichero a procesar (ej: CKA/01ArquitecturaKubernetes.md)'
-        required: false
-        default: ''
+
 jobs:
   convertir:
     runs-on: ubuntu-latest
@@ -21,34 +17,6 @@ jobs:
       - name: Checkout repo markdown
         uses: actions/checkout@v4
 
-      - name: Instalar dependencias
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          pip3 install pyyaml markdown weasyprint
-
-      - name: Detectar ficheros modificados
-        run: |
-          if [ -n "${{ github.event.inputs.fichero }}" ]; then
-            echo "${{ github.event.inputs.fichero }}" > /tmp/modificados.txt
-          elif git rev-parse HEAD~1 >/dev/null 2>&1; then
-            git diff --name-only HEAD~1 HEAD -- 'CKA/**/*.md' > /tmp/modificados.txt
-          else
-            git diff-tree --no-commit-id -r --name-only HEAD -- 'CKA/' > /tmp/modificados.txt
-          fi
-          cat /tmp/modificados.txt
-
-      - name: Convertir a PDF
-        run: |
-          python3 scripts/convertir.py /tmp/modificados.txt
-
-      - name: Debug - ver resultado conversión
-        run: |
-          echo "=== Ficheros modificados ==="
-          cat /tmp/modificados.txt
-          echo "=== Contenido /tmp/pdfs ==="
-          ls -la /tmp/pdfs/ || echo "directorio vacio o no existe"
-
       - name: Checkout repo documentacion
         uses: actions/checkout@v4
         with:
@@ -56,13 +24,47 @@ jobs:
           token: ${{ secrets.DOCS_TOKEN }}
           path: documentacion_estudio
 
+      - name: Detectar markdowns sin PDF
+        run: |
+          > /tmp/modificados.txt
+          find CKA/ -name "*.md" | while read md; do
+            pdf="documentacion_estudio/${md%.md}.pdf"
+            if [ ! -f "$pdf" ]; then
+              echo ">>> Sin PDF: $md"
+              echo "$md" >> /tmp/modificados.txt
+            else
+              echo ">>> Ya existe: $pdf, saltando"
+            fi
+          done
+          echo "=== Ficheros a procesar ==="
+          cat /tmp/modificados.txt
+
+      - name: Instalar dependencias
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y python3-pip
+          pip3 install pyyaml markdown weasyprint
+
+      - name: Convertir a PDF
+        run: |
+          python3 scripts/convertir.py /tmp/modificados.txt
+
+      - name: Debug - ver resultado conversión
+        run: |
+          echo "=== Ficheros a procesar ==="
+          cat /tmp/modificados.txt
+          echo "=== Contenido /tmp/pdfs ==="
+          ls -la /tmp/pdfs/ || echo "directorio vacio o no existe"
+
       - name: Copiar PDFs al repo destino
         run: |
           while IFS= read -r fichero; do
-            if [ -f "/tmp/pdfs/$(basename ${fichero%.md}).pdf" ]; then
+            pdf="/tmp/pdfs/$(basename ${fichero%.md}).pdf"
+            if [ -f "$pdf" ]; then
               SUBDIR=$(dirname $fichero)
-              mkdir -p documentacion_estudio/$SUBDIR
-              cp "/tmp/pdfs/$(basename ${fichero%.md}).pdf" "documentacion_estudio/$SUBDIR/"
+              mkdir -p "documentacion_estudio/$SUBDIR"
+              cp "$pdf" "documentacion_estudio/$SUBDIR/"
+              echo ">>> Copiado: $pdf → documentacion_estudio/$SUBDIR/"
             fi
           done < /tmp/modificados.txt
 
@@ -71,6 +73,6 @@ jobs:
           cd documentacion_estudio
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add CKA/
-          git diff --staged --quiet || git commit -m "PDF generado desde ${{ github.sha }}"
-          git push
+          git add .
+          git diff --staged --quiet && echo ">>> Nada nuevo que subir" || \
+            (git commit -m "PDFs generados desde ${{ github.sha }}" && git push)
