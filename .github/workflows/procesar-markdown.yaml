@@ -37,6 +37,13 @@ jobs:
         run: |
           python3 scripts/convertir.py /tmp/modificados.txt
 
+      - name: Debug - ver resultado conversión
+        run: |
+          echo "=== Ficheros modificados ==="
+          cat /tmp/modificados.txt
+          echo "=== Contenido /tmp/pdfs ==="
+          ls -la /tmp/pdfs/ || echo "directorio vacio o no existe"
+
       - name: Checkout repo documentacion
         uses: actions/checkout@v4
         with:
