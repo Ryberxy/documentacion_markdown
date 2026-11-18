@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - 'CKA/**.md'
+      - 'Anthropic/**.md'
   workflow_dispatch:
 
 jobs:
@@ -27,7 +28,7 @@ jobs:
       - name: Detectar markdowns sin PDF
         run: |
           > /tmp/modificados.txt
-          find CKA/ -name "*.md" | while read md; do
+          find CKA/ Anthropic/ -name "*.md" | while read md; do
             pdf="documentacion_estudio/${md%.md}.pdf"
             if [ ! -f "$pdf" ]; then
               echo ">>> Sin PDF: $md"
